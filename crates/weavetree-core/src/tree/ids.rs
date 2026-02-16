@@ -25,4 +25,20 @@ pub struct StateKey(u64);
 
 /// A wraper for an integer index used to determine the node's action list
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-struct ActionId(usize);
+pub struct ActionId(usize);
+
+impl ActionId {
+
+    /// Get the value of the actual action without having to access and risk overiding the internal value
+    pub fn index(&self) -> usize {
+        self.0
+    }
+}
+
+impl From<usize> for ActionId {
+
+    /// Allow for explicit conversion from usize to ActionId
+    fn from(value: usize) -> Self {
+        ActionId(value)
+    }
+}

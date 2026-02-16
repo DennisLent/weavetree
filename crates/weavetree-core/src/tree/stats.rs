@@ -1,6 +1,6 @@
 /// TODO: Potential for memeory optimization to use u32 and f32 instead.
 /// Stores the numbers MCTS updates constantly
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy)]
 pub struct EdgeStats {
     visits: u64,
     value_sum: f64
@@ -24,7 +24,7 @@ impl EdgeStats {
     }
 
     /// Retrieve the value sum of a certain edge.
-    pub fn value(&self) -> f64 {
+    pub fn value_sum(&self) -> f64 {
         self.value_sum
     }
 
@@ -41,12 +41,12 @@ impl EdgeStats {
     }
 
     /// Helper function just to check if the edge has been visisted or not
-    fn is_univisited(&self) -> bool {
+    pub fn is_unvisited(&self) -> bool {
         self.visits == 0
     }
 
     /// Determine the Q value of the edge
     pub fn q(&self) -> f64 {
-        if self.is_univisited() {0.0} else {self.value_sum / self.visits as f64}
+        if self.is_unvisited() {0.0} else {self.value_sum / self.visits as f64}
     }
 }

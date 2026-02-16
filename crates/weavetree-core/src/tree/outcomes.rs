@@ -2,14 +2,11 @@ use crate::tree::ids::{NodeId, StateKey};
 
 
 //TODO: Potentially need to switch the set to a hashmap, lets see about that later
-//TODO: for insert: return the child id (or Option<NodeId>) 
-// for “observe outcome”: return (child_id, is_new) in one call
-// might be more convenient for the rollout loops
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// represents one observed next state under a given `(s,a)` edge.
 /// Conceptually it holds `(next_state_key, child_node_id, count)`
-pub struct Outcome {
+struct Outcome {
     next_state_key: StateKey,
     child: NodeId,
     count: u64
@@ -59,29 +56,30 @@ impl OutcomeSet {
 
     /// Insert an outcome to the set
     /// We also make sure the Statekey has not been inserted yet
-    /// On success return `true` else return `false`
-    pub fn insert_outcome(&mut self, next_state_key: StateKey, child_id: NodeId) -> bool {
+    /// Returns Option<NodeId>, with Some(child_id) in case the insert worked
+    pub fn insert_outcome(&mut self, next_state_key: StateKey, child_id: NodeId) -> Option<NodeId> {
 
         if !self.outcomes.iter().any(|outcome| outcome.next_state_key == next_state_key) {
             self.outcomes.push(Outcome::new(next_state_key, child_id));
-            true
+            Some(child_id)
         }
         else {
-            false
+            None
         }
     }
 
     /// Icrement the count on a single occurence
-    /// On success return `true` else return `false`
-    pub fn increment_count(&mut self, next_state_key: StateKey) -> bool {
+    /// Returns Option<NodeId>, with Some(child_id) in case the incrementing worked
+    pub fn increment_outcome(&mut self, next_state_key: StateKey) -> Option<NodeId> {
 
         let outcome = self.outcomes.iter_mut().find(|outcome| outcome.next_state_key == next_state_key); 
         match outcome {
             Some(outcome) => {
                 outcome.increment_count();
-                true
+                Some(outcome.child)
+                
             }
-            None => false
+            None => None
 
         }
     }
