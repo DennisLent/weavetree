@@ -21,7 +21,7 @@ impl From<usize> for NodeId {
 /// Representation of the state to avoid storing the full state and heavy cloning.
 /// This needs to be deterministic, collision-resistant, and must not depend on rollout/search metadata.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-struct StateKey(u64);
+pub struct StateKey(u64);
 
 /// A wraper for an integer index used to determine the node's action list
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
