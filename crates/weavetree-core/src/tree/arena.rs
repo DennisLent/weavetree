@@ -1,17 +1,22 @@
-use std::{slice::{Iter, IterMut}, vec::IntoIter};
+use std::{
+    slice::{Iter, IterMut},
+    vec::IntoIter,
+};
 
 use crate::tree::ids::NodeId;
 
 /// Holds all items and allows for fast allocation and is cache friendly.
-struct Arena<T>{
+#[derive(Debug, Clone)]
+pub struct Arena<T> {
     storage: Vec<T>,
 }
 
 impl<T> Arena<T> {
-
     /// Create a new empty storage
-    pub fn new() -> Self{
-        Arena { storage: Vec::new() }
+    pub fn new() -> Self {
+        Arena {
+            storage: Vec::new(),
+        }
     }
 
     /// Allocate a new item to the storage and return the associated NodeId
@@ -34,6 +39,11 @@ impl<T> Arena<T> {
     /// Check the length of the Arena
     pub fn len(&self) -> usize {
         self.storage.len()
+    }
+
+    /// Clear the internal storage for full reset
+    pub fn clear(&mut self) {
+        self.storage.clear();
     }
 
     /// Check if the Arena is empty

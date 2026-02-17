@@ -1,6 +1,7 @@
 mod arena;
-mod ids;
-mod stats;
-mod outcomes;
 mod edges;
+mod ids;
 mod node;
+mod outcomes;
+mod stats;
+pub mod tree;

@@ -3,7 +3,6 @@
 pub struct NodeId(usize);
 
 impl NodeId {
-
     /// Get the value of the actual node without having to access and risk overiding the internal value
     pub fn index(&self) -> usize {
         self.0
@@ -11,7 +10,6 @@ impl NodeId {
 }
 
 impl From<usize> for NodeId {
-
     /// Allow for explicit conversion from usize to NodeId
     fn from(value: usize) -> Self {
         NodeId(value)
@@ -28,7 +26,6 @@ pub struct StateKey(u64);
 pub struct ActionId(usize);
 
 impl ActionId {
-
     /// Get the value of the actual action without having to access and risk overiding the internal value
     pub fn index(&self) -> usize {
         self.0
@@ -36,7 +33,6 @@ impl ActionId {
 }
 
 impl From<usize> for ActionId {
-
     /// Allow for explicit conversion from usize to ActionId
     fn from(value: usize) -> Self {
         ActionId(value)

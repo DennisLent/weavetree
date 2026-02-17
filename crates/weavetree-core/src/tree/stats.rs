@@ -3,13 +3,15 @@
 #[derive(Debug, Clone, Copy)]
 pub struct EdgeStats {
     visits: u64,
-    value_sum: f64
+    value_sum: f64,
 }
 
 impl EdgeStats {
-
     pub fn new() -> Self {
-        EdgeStats { visits: 0, value_sum: 0.0 }
+        EdgeStats {
+            visits: 0,
+            value_sum: 0.0,
+        }
     }
 
     /// Retrieve the amount of visits to a certain edge
@@ -47,6 +49,10 @@ impl EdgeStats {
 
     /// Determine the Q value of the edge
     pub fn q(&self) -> f64 {
-        if self.is_unvisited() {0.0} else {self.value_sum / self.visits as f64}
+        if self.is_unvisited() {
+            0.0
+        } else {
+            self.value_sum / self.visits as f64
+        }
     }
 }
