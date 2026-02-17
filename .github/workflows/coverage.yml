@@ -39,6 +39,7 @@ jobs:
             --output-path coverage/rust/lcov.info
           cargo llvm-cov report \
             --workspace \
+            --all-features \
             --cobertura \
             --output-path coverage/rust/cobertura.xml
 
