@@ -1,0 +1,74 @@
+name: Coverage
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  coverage:
+    name: Rust Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Generate coverage reports
+        run: |
+          set -euo pipefail
+          mkdir -p coverage/rust
+          cargo llvm-cov \
+            --workspace \
+            --all-features \
+            --lcov \
+            --output-path coverage/rust/lcov.info
+          cargo llvm-cov report \
+            --workspace \
+            --all-features \
+            --cobertura \
+            --output-path coverage/rust/cobertura.xml
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/**
+
+      - name: Upload Rust coverage to Codecov (Cobertura)
+        if: ${{ always() }}
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage/rust/cobertura.xml
+          flags: rust
+          name: rust-coverage
+          fail_ci_if_error: false
+          verbose: true
+          disable_search: true
+
+      - name: Upload Rust coverage to Codecov (LCOV fallback)
+        if: ${{ always() && hashFiles('coverage/rust/lcov.info') != '' }}
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage/rust/lcov.info
+          flags: rust
+          name: rust-coverage-lcov
+          fail_ci_if_error: false
+          verbose: true
+          disable_search: true

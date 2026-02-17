@@ -1,7 +1,13 @@
 mod arena;
 mod edges;
-mod ids;
+pub mod error;
+pub mod ids;
+pub mod mcts;
 mod node;
 mod outcomes;
+pub mod rollout;
+pub mod search_tree;
 mod stats;
-pub mod tree;
+
+#[cfg(test)]
+mod tests;

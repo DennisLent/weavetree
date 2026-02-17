@@ -6,7 +6,6 @@ use crate::tree::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// Enum to help determine if a node has been expanded or not
 /// Useful for parallel expansion
-
 pub enum ExpansionState {
     Unexpanded,
     Expanding,
@@ -58,7 +57,7 @@ impl Node {
         self.expansion_state = ExpansionState::Expanded;
     }
 
-    /// Select an edge based on UCB. 
+    /// Select an edge based on UCB.
     /// Returns the chosen `ActionId` (index in `edges`).
     pub fn select_edge(&self, c: f64) -> Option<ActionId> {
         if self.edges.is_empty() {
@@ -93,6 +92,11 @@ impl Node {
     /// Using an action id, return the corresponding action edge as mutable
     pub fn edge_mut(&mut self, action_id: ActionId) -> Option<&mut ActionEdge> {
         self.edges.get_mut(action_id.index())
+    }
+
+    /// Return all action edges for this node.
+    pub fn edges(&self) -> &[ActionEdge] {
+        &self.edges
     }
 
     /// Return the depth of a specific node

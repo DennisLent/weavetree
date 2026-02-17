@@ -1,0 +1,6 @@
+iterations: 256
+c: 1.4
+gamma: 1.0
+max_steps: 128
+return_type: discounted
+fixed_horizon_steps: 32

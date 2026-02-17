@@ -30,6 +30,10 @@ impl Outcome {
     fn child(&self) -> NodeId {
         self.child
     }
+
+    fn count(&self) -> u64 {
+        self.count
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,10 +59,7 @@ impl OutcomeSet {
             .outcomes
             .iter()
             .find(|outcome| outcome.next_state_key == next_state_key);
-        match outcome {
-            Some(outcome) => Some(outcome.child),
-            None => None,
-        }
+        outcome.map(|outcome| outcome.child())
     }
 
     /// Insert an outcome to the set
@@ -87,9 +88,22 @@ impl OutcomeSet {
         match outcome {
             Some(outcome) => {
                 outcome.increment_count();
-                Some(outcome.child)
+                Some(outcome.child())
             }
             None => None,
         }
+    }
+
+    /// Return the amount of distinct outcomes seen for this edge.
+    pub fn len(&self) -> usize {
+        self.outcomes.len()
+    }
+
+    /// Return how many times a specific next state has been observed.
+    pub fn count_for(&self, next_state_key: StateKey) -> Option<u64> {
+        self.outcomes
+            .iter()
+            .find(|outcome| outcome.next_state_key == next_state_key)
+            .map(|outcome| outcome.count())
     }
 }

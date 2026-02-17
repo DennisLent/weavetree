@@ -21,6 +21,20 @@ impl From<usize> for NodeId {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct StateKey(u64);
 
+impl StateKey {
+    /// Return the internal numeric representation of this key.
+    pub fn value(&self) -> u64 {
+        self.0
+    }
+}
+
+impl From<u64> for StateKey {
+    /// Allow for explicit conversion from u64 to StateKey.
+    fn from(value: u64) -> Self {
+        StateKey(value)
+    }
+}
+
 /// A wraper for an integer index used to determine the node's action list
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ActionId(usize);

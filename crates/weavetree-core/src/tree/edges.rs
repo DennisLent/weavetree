@@ -48,8 +48,8 @@ impl ActionEdge {
 
     /// Find the next node associated to this state key
     /// If found returns `Some(NodeId)` else None
-    pub fn get_child_for(&mut self, next_state_key: StateKey) -> Option<NodeId> {
-        self.increment_outcome(next_state_key)
+    pub fn get_child_for(&self, next_state_key: StateKey) -> Option<NodeId> {
+        self.outcomes.get_child_for(next_state_key)
     }
 
     /// Insert an outcome to the OutcomeSet
@@ -68,5 +68,20 @@ impl ActionEdge {
     /// Return the amount of times this edge has been visited
     pub fn visits(&self) -> u64 {
         self.edge_stats.visits()
+    }
+
+    /// Return the mean value estimate for this edge.
+    pub fn q(&self) -> f64 {
+        self.edge_stats.q()
+    }
+
+    /// Return the amount of distinct outcomes observed under this edge.
+    pub fn outcomes_len(&self) -> usize {
+        self.outcomes.len()
+    }
+
+    /// Return the count for a given observed next state key.
+    pub fn outcome_count_for(&self, next_state_key: StateKey) -> Option<u64> {
+        self.outcomes.count_for(next_state_key)
     }
 }
