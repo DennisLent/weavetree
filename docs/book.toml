@@ -1,0 +1,23 @@
+[book]
+title = "Weavetree"
+authors = ["DennisLent"]
+description = "A fast, reproducible abstraction-aware Monte Carlo Tree Search engine written in Rust, with optional Python bindings."
+language = "en"
+multilingual = false
+
+[build]
+# Keep build artifacts out of source control; GH Actions will publish from here.
+build-dir = "build"
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "navy"
+smart-punctuation = true
+git-repository-url = "https://github.com/DennisLent/weavetree"
+site-url = "/"
+additional-css = []
+additional-js = []
+no-section-label = false
+
+[output.html.search]
+enable = true
