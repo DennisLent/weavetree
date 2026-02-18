@@ -3,7 +3,6 @@ title = "Weavetree"
 authors = ["DennisLent"]
 description = "A fast, reproducible abstraction-aware Monte Carlo Tree Search engine written in Rust, with optional Python bindings."
 language = "en"
-multilingual = false
 
 [build]
 # Keep build artifacts out of source control; GH Actions will publish from here.
