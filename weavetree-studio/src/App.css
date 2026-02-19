@@ -1,0 +1,173 @@
+.app-shell {
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  grid-template-columns: 320px 1fr;
+}
+
+.side-panel {
+  border-right: 1px solid #d1d5db;
+  background: #fafafa;
+  padding: 16px;
+  overflow: auto;
+}
+
+.side-panel h2 {
+  margin: 0 0 12px;
+  font-size: 20px;
+}
+
+.panel-section {
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.panel-section h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: #111827;
+}
+
+.panel-section label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #374151;
+}
+
+.panel-section input {
+  width: 100%;
+  margin-top: 4px;
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.inline-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline-checkbox input {
+  width: auto;
+  margin: 0;
+}
+
+.panel-section button {
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.panel-section button.danger {
+  background: #b91c1c;
+}
+
+.editor-block {
+  border-top: 1px solid #e5e7eb;
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.item-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.muted {
+  margin: 0;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.ok {
+  margin: 0;
+  color: #166534;
+  font-size: 12px;
+}
+
+.warn {
+  margin: 4px 0 0;
+  color: #92400e;
+  font-size: 12px;
+}
+
+.error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.canvas-wrap {
+  width: 100%;
+  height: 100%;
+}
+
+.state-node {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  border: 2px solid #1f2937;
+  background: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  position: relative;
+}
+
+.state-node.terminal {
+  background: #fef3c7;
+}
+
+.action-node {
+  width: 68px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1.5px solid #1f2937;
+  background: #dbeafe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  position: relative;
+}
+
+.dock-handle {
+  width: 9px;
+  height: 9px;
+  border: 1px solid #0f172a;
+}
+
+.dock-source {
+  background: #0ea5e9;
+}
+
+.dock-target {
+  background: #f59e0b;
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: 320px 1fr;
+  }
+
+  .side-panel {
+    border-right: 0;
+    border-bottom: 1px solid #d1d5db;
+  }
+}
