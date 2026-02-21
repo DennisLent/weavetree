@@ -2,6 +2,8 @@
 
 This section covers two practical steps: cloning this repository and using `weavetree-core` from another Rust project.
 
+If you want to design an MDP in the browser first, launch [Weavetree Studio](./studio/).
+
 ## Clone the repository
 
 Clone the project and enter the repository root:

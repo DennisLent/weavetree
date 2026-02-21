@@ -1,0 +1,20 @@
+version: 1
+start: s0
+states:
+  - id: s0
+    terminal: false
+    actions:
+      - id: a0
+        outcomes:
+          - next: s1
+            prob: 1.0
+            reward: 1.0
+      - id: a1
+        outcomes:
+          - next: s2
+            prob: 1.0
+            reward: 3.0
+  - id: s1
+    terminal: true
+  - id: s2
+    terminal: true

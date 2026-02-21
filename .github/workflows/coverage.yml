@@ -33,11 +33,14 @@ jobs:
           set -euo pipefail
           mkdir -p coverage/rust
           cargo llvm-cov \
-            --workspace \
+            --package weavetree-core \
+            --package weavetree-mdp \
             --all-features \
             --lcov \
             --output-path coverage/rust/lcov.info
           cargo llvm-cov report \
+            --package weavetree-core \
+            --package weavetree-mdp \
             --cobertura \
             --output-path coverage/rust/cobertura.xml
 

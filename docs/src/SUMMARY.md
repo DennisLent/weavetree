@@ -1,6 +1,7 @@
 # Summary
 
 - [Introduction](introduction.md)
+- [Weavetree Studio](studio.md)
 - [Getting Started](getting-started.md)
 - [Example: Tiny Gridworld](example-gridworld.md)
 - [Configuration](configuration.md)

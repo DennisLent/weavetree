@@ -21,6 +21,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: weavetree-studio/package-lock.json
+
       - name: Install latest mdbook
         run: |
           tag=$(curl 'https://api.github.com/repos/rust-lang/mdbook/releases/latest' | jq -r '.tag_name')
@@ -31,6 +38,17 @@ jobs:
 
       - name: Build book
         run: mdbook build docs
+
+      - name: Install studio dependencies
+        run: npm ci --prefix weavetree-studio
+
+      - name: Build studio
+        run: npm run build --prefix weavetree-studio
+
+      - name: Copy studio into pages artifact
+        run: |
+          mkdir -p docs/build/studio
+          cp -r weavetree-studio/dist/* docs/build/studio/
       
       - name: Setup Pages
         uses: actions/configure-pages@v4

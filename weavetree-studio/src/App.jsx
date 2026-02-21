@@ -12,6 +12,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import './App.css'
+import { mdpSpecToYaml, toMdpSpecFromGraph } from './model/exportMdp'
 
 function formatOutcomeLabel(probability, reward) {
   return `p=${probability}, r=${reward}`
@@ -162,6 +163,8 @@ export default function App() {
   const [stateIdInput, setStateIdInput] = useState('')
   const [stateTerminalInput, setStateTerminalInput] = useState(false)
   const [actionNameInput, setActionNameInput] = useState('')
+  const [startStateInput, setStartStateInput] = useState('')
+  const [exportFileNameInput, setExportFileNameInput] = useState('model.mdp.yaml')
   const [selectedNodeId, setSelectedNodeId] = useState(null)
   const [selectedEdgeId, setSelectedEdgeId] = useState(null)
   const [errorMessage, setErrorMessage] = useState('')
@@ -427,6 +430,31 @@ export default function App() {
     )
   }
 
+  const exportYaml = () => {
+    setErrorMessage('')
+    try {
+      const spec = toMdpSpecFromGraph(nodes, edges, startStateInput)
+      const yaml = mdpSpecToYaml(spec)
+
+      const requestedName = exportFileNameInput.trim() || 'model.mdp.yaml'
+      const downloadName = /\.ya?ml$/i.test(requestedName)
+        ? requestedName
+        : `${requestedName}.mdp.yaml`
+
+      const blob = new Blob([yaml], { type: 'application/x-yaml;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = downloadName
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to export YAML.')
+    }
+  }
+
   return (
     <div className="app-shell">
       <aside className="side-panel">
@@ -594,6 +622,27 @@ export default function App() {
               )
             })
           )}
+        </div>
+
+        <div className="panel-section">
+          <h3>Export YAML</h3>
+          <label>
+            Start state id (optional)
+            <input
+              value={startStateInput}
+              onChange={(event) => setStartStateInput(event.target.value)}
+              placeholder="auto: first state in graph"
+            />
+          </label>
+          <label>
+            File name
+            <input
+              value={exportFileNameInput}
+              onChange={(event) => setExportFileNameInput(event.target.value)}
+              placeholder="model.mdp.yaml"
+            />
+          </label>
+          <button onClick={exportYaml}>Download YAML</button>
         </div>
 
         {errorMessage ? <p className="error">{errorMessage}</p> : null}
