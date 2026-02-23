@@ -1,4 +1,7 @@
-# Public API Reference
+# Public API Reference (`weavetree-core`)
+
+This page documents the core search crate (`weavetree-core`).
+For environment modeling and simulator APIs, see [Using weavetree-mdp](./weavetree-mdp.md).
 
 The crate root re-exports the primary types used by consumers.
 

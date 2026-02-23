@@ -1,9 +1,13 @@
 # Introduction
 
-Weavetree is a project focused on fast and reproducible Monte Carlo Tree Search (MCTS) in Rust.
+Weavetree is a Rust project for fast, reproducible Monte Carlo Tree Search (MCTS).
 
-You can build MDPs directly in the browser using [Weavetree Studio](./studio/), which is hosted with the docs.
+This repository currently provides two crates that work together:
 
-At the moment, this repository contains one crate: `weavetree-core`. That crate provides the core search functionality, including tree traversal, rollout handling, and backpropagation.
+- `weavetree-core`: the generic MCTS engine (`Tree`, selection/expansion, rollout, backpropagation).
+- `weavetree-mdp`: tooling to define environments as MDPs and plug them into `weavetree-core`.
 
-The long-term structure can expand, but today `weavetree-core` is the main implementation and the right place to start.
+If your environment is simple and table-like, `weavetree-mdp` lets you describe it with YAML and compile it into a runtime simulator.
+If your environment needs richer state encoding (structs/enums/boards), `weavetree-mdp` also supports custom typed simulators through `MdpDomain`.
+
+You can also build and edit YAML MDPs in the browser via [Weavetree Studio](./studio/).

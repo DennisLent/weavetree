@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
 use weavetree_core::{ActionId, ReturnType, SearchConfig, StateKey as CoreStateKey, Tree};
-use weavetree_mdp::{MdpError, MdpSimulator, MdpSpec, StateKey};
+use weavetree_mdp::{DomainSimulator, MdpDomain, MdpError, MdpSimulator, MdpSpec, StateKey};
 
 const VALID_MDP_YAML: &str = r#"
 version: 1
@@ -170,6 +170,97 @@ states:
                     .step(StateKey::from(state.value() as usize), action.index());
                 (CoreStateKey::from(next.index() as u64), reward, terminal)
             },
+            |_state, _num_actions| ActionId::from(0),
+        )
+        .expect("run should succeed");
+
+    assert_eq!(run.iterations_completed, config.iterations);
+
+    let best = tree
+        .best_root_action_by_value()
+        .expect("lookup should succeed")
+        .expect("action should exist");
+
+    assert_eq!(best.index(), 1);
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum CounterPhase {
+    Running,
+    Finished,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct CounterState {
+    count: u8,
+    phase: CounterPhase,
+}
+
+struct CounterDomain;
+
+impl MdpDomain for CounterDomain {
+    type State = CounterState;
+
+    fn start_state(&self) -> Self::State {
+        CounterState {
+            count: 0,
+            phase: CounterPhase::Running,
+        }
+    }
+
+    fn is_terminal(&self, state: &Self::State) -> bool {
+        matches!(state.phase, CounterPhase::Finished)
+    }
+
+    fn num_actions(&self, state: &Self::State) -> usize {
+        if self.is_terminal(state) { 0 } else { 2 }
+    }
+
+    fn step(
+        &self,
+        state: &Self::State,
+        action_id: usize,
+        _sample: f64,
+    ) -> (Self::State, f64, bool) {
+        if self.is_terminal(state) {
+            return (state.clone(), 0.0, true);
+        }
+
+        let reward = match action_id {
+            0 => 1.0,
+            1 => 3.0,
+            _ => 0.0,
+        };
+
+        (
+            CounterState {
+                count: state.count.saturating_add(1),
+                phase: CounterPhase::Finished,
+            },
+            reward,
+            true,
+        )
+    }
+}
+
+#[test]
+fn mcts_runs_with_custom_typed_state_domain() {
+    let shared = DomainSimulator::new(CounterDomain, 11).into_shared();
+    let mut tree = Tree::new(shared.start_state_key(), shared.root_is_terminal());
+    let config = SearchConfig {
+        iterations: 20,
+        c: 0.0,
+        gamma: 1.0,
+        max_steps: 2,
+        return_type: ReturnType::Discounted,
+        fixed_horizon_steps: 2,
+    };
+
+    let run = tree
+        .run(
+            &config,
+            shared.num_actions_fn(),
+            shared.step_fn(),
             |_state, _num_actions| ActionId::from(0),
         )
         .expect("run should succeed");

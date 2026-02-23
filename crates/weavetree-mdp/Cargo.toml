@@ -9,6 +9,6 @@ rand_chacha = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 thiserror = "2.0"
+weavetree-core = { path = "../weavetree-core" }
 
 [dev-dependencies]
-weavetree-core = { path = "../weavetree-core" }
