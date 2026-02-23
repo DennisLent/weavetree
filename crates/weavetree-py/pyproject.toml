@@ -1,0 +1,19 @@
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "weavetree"
+version = "0.1.0"
+description = "Python bindings for weavetree-core and weavetree-mdp"
+requires-python = ">=3.9"
+classifiers = [
+  "Programming Language :: Rust",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+]
+
+[tool.maturin]
+module-name = "weavetree"
+manifest-path = "Cargo.toml"
+python-source = "python"

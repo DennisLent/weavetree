@@ -55,25 +55,49 @@ where
     FStep: FnMut(StateKey, ActionId) -> (StateKey, f64, bool),
     FPolicy: FnMut(StateKey, usize) -> ActionId,
 {
+    rollout_fallible(
+        start_state_key,
+        |state| Ok::<usize, TreeError>(num_actions(state)),
+        |state, action| Ok::<(StateKey, f64, bool), TreeError>(step(state, action)),
+        |state, n| Ok::<ActionId, TreeError>(rollout_policy(state, n)),
+        params,
+    )
+}
+
+/// Fallible rollout variant where environment/policy callbacks may fail.
+pub fn rollout_fallible<FNum, FStep, FPolicy, E>(
+    start_state_key: StateKey,
+    mut num_actions: FNum,
+    mut step: FStep,
+    mut rollout_policy: FPolicy,
+    params: RolloutParams,
+) -> Result<f64, E>
+where
+    FNum: FnMut(StateKey) -> Result<usize, E>,
+    FStep: FnMut(StateKey, ActionId) -> Result<(StateKey, f64, bool), E>,
+    FPolicy: FnMut(StateKey, usize) -> Result<ActionId, E>,
+    E: From<TreeError>,
+{
     let mut state_key = start_state_key;
     let mut total_return = 0.0;
     let mut discount = 1.0;
 
     for _ in 0..params.step_limit() {
-        let action_count = num_actions(state_key);
+        let action_count = num_actions(state_key)?;
         if action_count == 0 {
             break;
         }
 
-        let action_id = rollout_policy(state_key, action_count);
+        let action_id = rollout_policy(state_key, action_count)?;
         if action_id.index() >= action_count {
             return Err(TreeError::InvalidRolloutAction {
                 state_key,
                 action_id,
                 num_actions: action_count,
-            });
+            }
+            .into());
         }
-        let (next_state_key, reward, is_terminal) = step(state_key, action_id);
+        let (next_state_key, reward, is_terminal) = step(state_key, action_id)?;
 
         match params.return_type {
             ReturnType::Discounted => {

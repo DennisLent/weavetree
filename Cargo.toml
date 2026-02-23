@@ -1,3 +1,3 @@
 [workspace]
-members = ["crates/weavetree-core", "crates/weavetree-mdp"]
+members = ["crates/weavetree-core", "crates/weavetree-mdp", "crates/weavetree-py"]
 resolver = "2"

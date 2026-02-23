@@ -2,10 +2,11 @@ use std::{fmt, fs, path::Path};
 
 use serde::{Deserialize, Serialize};
 
+use crate::tree::rollout::rollout_fallible;
 use crate::tree::{
     error::TreeError,
     ids::{ActionId, NodeId},
-    rollout::{ReturnType, RolloutParams, rollout},
+    rollout::{ReturnType, RolloutParams},
     search_tree::Tree,
 };
 
@@ -119,6 +120,33 @@ impl fmt::Display for SearchConfigError {
 
 impl std::error::Error for SearchConfigError {}
 
+/// Error type for fallible callback-based MCTS runs.
+#[derive(Debug)]
+pub enum RunError<E> {
+    Tree(TreeError),
+    Callback(E),
+}
+
+impl<E> fmt::Display for RunError<E>
+where
+    E: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RunError::Tree(err) => write!(f, "{err}"),
+            RunError::Callback(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl<E> std::error::Error for RunError<E> where E: std::error::Error + 'static {}
+
+impl<E> From<TreeError> for RunError<E> {
+    fn from(value: TreeError) -> Self {
+        RunError::Tree(value)
+    }
+}
+
 /// Per-iteration metrics emitted by MCTS.
 #[derive(Debug, Clone, Copy)]
 pub struct IterationMetrics {
@@ -187,17 +215,51 @@ impl Tree {
             FnMut(crate::tree::ids::StateKey, ActionId) -> (crate::tree::ids::StateKey, f64, bool),
         FPolicy: FnMut(crate::tree::ids::StateKey, usize) -> ActionId,
     {
-        let policy_result = self.tree_policy(config.c, &mut *num_actions, &mut *step)?;
+        self.iterate_fallible(
+            config,
+            &mut |state| Ok::<usize, TreeError>(num_actions(state)),
+            &mut |state, action| {
+                Ok::<(crate::tree::ids::StateKey, f64, bool), TreeError>(step(state, action))
+            },
+            &mut |state, n| Ok::<ActionId, TreeError>(rollout_policy(state, n)),
+        )
+        .map_err(|err| match err {
+            RunError::Tree(tree_err) => tree_err,
+            RunError::Callback(tree_err) => tree_err,
+        })
+    }
+
+    /// Execute one complete MCTS iteration with fallible callbacks.
+    pub fn iterate_fallible<FNum, FStep, FPolicy, E>(
+        &mut self,
+        config: &SearchConfig,
+        num_actions: &mut FNum,
+        step: &mut FStep,
+        rollout_policy: &mut FPolicy,
+    ) -> Result<IterationMetrics, RunError<E>>
+    where
+        FNum: FnMut(crate::tree::ids::StateKey) -> Result<usize, E>,
+        FStep: FnMut(
+            crate::tree::ids::StateKey,
+            ActionId,
+        ) -> Result<(crate::tree::ids::StateKey, f64, bool), E>,
+        FPolicy: FnMut(crate::tree::ids::StateKey, usize) -> Result<ActionId, E>,
+    {
+        let policy_result = self.tree_policy_fallible(
+            config.c,
+            |s| num_actions(s).map_err(RunError::Callback),
+            |s, a| step(s, a).map_err(RunError::Callback),
+        )?;
         let leaf = self.node(policy_result.leaf)?;
         let leaf_state_key = leaf.state_key();
         let rollout_return = if leaf.is_terminal() {
             0.0
         } else {
-            rollout(
+            rollout_fallible(
                 leaf_state_key,
-                &mut *num_actions,
-                &mut *step,
-                &mut *rollout_policy,
+                |s| num_actions(s).map_err(RunError::Callback),
+                |s, a| step(s, a).map_err(RunError::Callback),
+                |s, n| rollout_policy(s, n).map_err(RunError::Callback),
                 config.rollout_params(),
             )?
         };
@@ -218,9 +280,9 @@ impl Tree {
     pub fn run<FNum, FStep, FPolicy>(
         &mut self,
         config: &SearchConfig,
-        num_actions: FNum,
-        step: FStep,
-        rollout_policy: FPolicy,
+        mut num_actions: FNum,
+        mut step: FStep,
+        mut rollout_policy: FPolicy,
     ) -> Result<RunMetrics, TreeError>
     where
         FNum: FnMut(crate::tree::ids::StateKey) -> usize,
@@ -228,7 +290,18 @@ impl Tree {
             FnMut(crate::tree::ids::StateKey, ActionId) -> (crate::tree::ids::StateKey, f64, bool),
         FPolicy: FnMut(crate::tree::ids::StateKey, usize) -> ActionId,
     {
-        self.run_with_hook(config, num_actions, step, rollout_policy, |_| {})
+        self.run_fallible(
+            config,
+            |state| Ok::<usize, TreeError>(num_actions(state)),
+            |state, action| {
+                Ok::<(crate::tree::ids::StateKey, f64, bool), TreeError>(step(state, action))
+            },
+            |state, n| Ok::<ActionId, TreeError>(rollout_policy(state, n)),
+        )
+        .map_err(|err| match err {
+            RunError::Tree(tree_err) => tree_err,
+            RunError::Callback(tree_err) => tree_err,
+        })
     }
 
     /// Run MCTS and invoke a callback after each completed iteration.
@@ -238,7 +311,7 @@ impl Tree {
         mut num_actions: FNum,
         mut step: FStep,
         mut rollout_policy: FPolicy,
-        mut on_iteration: FHook,
+        on_iteration: FHook,
     ) -> Result<RunMetrics, TreeError>
     where
         FNum: FnMut(crate::tree::ids::StateKey) -> usize,
@@ -247,11 +320,63 @@ impl Tree {
         FPolicy: FnMut(crate::tree::ids::StateKey, usize) -> ActionId,
         FHook: FnMut(&IterationMetrics),
     {
+        self.run_with_hook_fallible(
+            config,
+            |state| Ok::<usize, TreeError>(num_actions(state)),
+            |state, action| {
+                Ok::<(crate::tree::ids::StateKey, f64, bool), TreeError>(step(state, action))
+            },
+            |state, n| Ok::<ActionId, TreeError>(rollout_policy(state, n)),
+            on_iteration,
+        )
+        .map_err(|err| match err {
+            RunError::Tree(tree_err) => tree_err,
+            RunError::Callback(tree_err) => tree_err,
+        })
+    }
+
+    /// Run MCTS for `config.iterations` with fallible callbacks.
+    pub fn run_fallible<FNum, FStep, FPolicy, E>(
+        &mut self,
+        config: &SearchConfig,
+        num_actions: FNum,
+        step: FStep,
+        rollout_policy: FPolicy,
+    ) -> Result<RunMetrics, RunError<E>>
+    where
+        FNum: FnMut(crate::tree::ids::StateKey) -> Result<usize, E>,
+        FStep: FnMut(
+            crate::tree::ids::StateKey,
+            ActionId,
+        ) -> Result<(crate::tree::ids::StateKey, f64, bool), E>,
+        FPolicy: FnMut(crate::tree::ids::StateKey, usize) -> Result<ActionId, E>,
+    {
+        self.run_with_hook_fallible(config, num_actions, step, rollout_policy, |_| {})
+    }
+
+    /// Run MCTS with fallible callbacks and invoke a hook per iteration.
+    pub fn run_with_hook_fallible<FNum, FStep, FPolicy, FHook, E>(
+        &mut self,
+        config: &SearchConfig,
+        mut num_actions: FNum,
+        mut step: FStep,
+        mut rollout_policy: FPolicy,
+        mut on_iteration: FHook,
+    ) -> Result<RunMetrics, RunError<E>>
+    where
+        FNum: FnMut(crate::tree::ids::StateKey) -> Result<usize, E>,
+        FStep: FnMut(
+            crate::tree::ids::StateKey,
+            ActionId,
+        ) -> Result<(crate::tree::ids::StateKey, f64, bool), E>,
+        FPolicy: FnMut(crate::tree::ids::StateKey, usize) -> Result<ActionId, E>,
+        FHook: FnMut(&IterationMetrics),
+    {
         let mut metrics = RunMetrics::new(config.iterations);
 
         for _ in 0..config.iterations {
             let iteration_metrics =
-                self.iterate(config, &mut num_actions, &mut step, &mut rollout_policy)?;
+                self.iterate_fallible(config, &mut num_actions, &mut step, &mut rollout_policy)?;
 
             on_iteration(&iteration_metrics);
             metrics.record(iteration_metrics);

@@ -108,6 +108,25 @@ impl Tree {
         FNum: FnMut(StateKey) -> usize,
         FStep: FnMut(StateKey, ActionId) -> (StateKey, f64, bool),
     {
+        self.tree_policy_fallible(
+            c,
+            |state| Ok::<usize, TreeError>(num_actions(state)),
+            |state, action| Ok::<(StateKey, f64, bool), TreeError>(step(state, action)),
+        )
+    }
+
+    /// Fallible tree policy where environment callbacks may fail.
+    pub fn tree_policy_fallible<FNum, FStep, E>(
+        &mut self,
+        c: f64,
+        mut num_actions: FNum,
+        mut step: FStep,
+    ) -> Result<TreePolicyResult, E>
+    where
+        FNum: FnMut(StateKey) -> Result<usize, E>,
+        FStep: FnMut(StateKey, ActionId) -> Result<(StateKey, f64, bool), E>,
+        E: From<TreeError>,
+    {
         let mut current = self.root_id();
         let mut path: Vec<(NodeId, ActionId)> = Vec::new();
         let mut reward: f64 = 0.0;
@@ -131,7 +150,7 @@ impl Tree {
             {
                 let node = self.node_mut(current)?;
                 if !node.is_expanded() {
-                    let n = num_actions(state_key);
+                    let n = num_actions(state_key)?;
 
                     // If no actions, treat as leaf/terminal-like stop
                     if n == 0 {
@@ -157,7 +176,7 @@ impl Tree {
             path.push((current, action));
 
             // Sample environment outcome (chance)
-            let (next_key, r, next_terminal) = step(state_key, action);
+            let (next_key, r, next_terminal) = step(state_key, action)?;
             reward += r;
 
             // Update outcome counts / route to child

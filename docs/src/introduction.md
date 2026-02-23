@@ -11,3 +11,5 @@ If your environment is simple and table-like, `weavetree-mdp` lets you describe 
 If your environment needs richer state encoding (structs/enums/boards), `weavetree-mdp` also supports custom typed simulators through `MdpDomain`.
 
 You can also build and edit YAML MDPs in the browser via [Weavetree Studio](./studio/).
+
+For Python usage of the YAML workflow and simulator APIs, see [Python Bindings](./python-bindings.md).

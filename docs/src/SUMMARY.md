@@ -6,6 +6,7 @@
 - [Weavetree MDP](weavetree-mdp.md)
   - [YAML MDP Workflow](weavetree-mdp/yaml-workflow.md)
   - [Typed Domain Workflow](weavetree-mdp/typed-domain.md)
+- [Python Bindings](python-bindings.md)
 - [Example: Tiny Gridworld](example-gridworld.md)
 - [Configuration](configuration.md)
 - [Public API Reference](api-reference.md)

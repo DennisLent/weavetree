@@ -9,7 +9,6 @@ A fast, reproducible abstraction-aware Monte Carlo Tree Search engine written in
 
 - weavetree-cli for toolchain purposes
 - reproducibility
-- python bindings
 - abstraction algorithms (partitioning, bisimulation, approximate bisimulation)
 - detailed logging and extraction during runs (add standardized outputs e.g. via JSON)
     - visualization on top
