@@ -14,3 +14,10 @@ A fast, reproducible abstraction-aware Monte Carlo Tree Search engine written in
     - visualization on top
 - concurrency during simulation for faster sims
 - MCTS and uMCTS
+- Publish-ready crate metadata (description, license, repo, docs, crate-level readme, keywords, categories)
+- root README
+- integration level testing
+
+## Issues
+
+- Core uses StateKey(u64) | compiled MDP uses StateKey(usize)
