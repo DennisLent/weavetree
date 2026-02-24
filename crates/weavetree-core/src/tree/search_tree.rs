@@ -3,6 +3,7 @@ use crate::tree::{
     error::TreeError,
     ids::{ActionId, NodeId, StateKey},
     node::Node,
+    snapshot::{ActionEdgeSnapshot, NodeSnapshot, OutcomeSnapshot, TreeSnapshot},
 };
 
 #[derive(Debug, Clone)]
@@ -224,5 +225,58 @@ impl Tree {
                 reward,
             });
         }
+    }
+
+    /// Export a complete tree snapshot suitable for JSON serialization.
+    pub fn snapshot(&self) -> TreeSnapshot {
+        let mut nodes = Vec::with_capacity(self.arena.len());
+
+        for (node_idx, node) in self.arena.iter().enumerate() {
+            let (parent_node_id, parent_action_id) = match node.parent() {
+                Some((p, a)) => (Some(p.index()), Some(a.index())),
+                None => (None, None),
+            };
+
+            let edges = node
+                .edges()
+                .iter()
+                .map(|edge| ActionEdgeSnapshot {
+                    action_id: edge.action().index(),
+                    visits: edge.visits(),
+                    value_sum: edge.value_sum(),
+                    q: edge.q(),
+                    outcomes: edge
+                        .outcomes_iter()
+                        .map(|(next_state_key, child_node_id, count)| OutcomeSnapshot {
+                            next_state_key: next_state_key.value(),
+                            child_node_id: child_node_id.index(),
+                            count,
+                        })
+                        .collect(),
+                })
+                .collect();
+
+            nodes.push(NodeSnapshot {
+                node_id: node_idx,
+                state_key: node.state_key().value(),
+                depth: node.depth(),
+                is_terminal: node.is_terminal(),
+                parent_node_id,
+                parent_action_id,
+                edges,
+            });
+        }
+
+        TreeSnapshot {
+            schema_version: 1,
+            root_node_id: self.root_id().index(),
+            node_count: self.node_count(),
+            nodes,
+        }
+    }
+
+    /// Serialize the full tree snapshot as pretty-printed JSON.
+    pub fn snapshot_json_pretty(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string_pretty(&self.snapshot())
     }
 }

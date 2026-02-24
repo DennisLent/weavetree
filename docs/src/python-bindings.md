@@ -122,6 +122,19 @@ print("iterations:", metrics.iterations_completed)
 print("avg return:", metrics.average_total_return)
 ```
 
+Detailed logging is opt-in:
+
+```python
+metrics = t.run(
+    sim,
+    config,
+    detailed_logging=True,     # print per-iteration diagnostics
+    log_format="jsonl",        # "text" or "jsonl"
+    log_path="run.jsonl",      # optional file export
+    export_tree_path="tree_snapshot.json",  # optional final tree export
+)
+```
+
 You can also provide a custom rollout policy callback:
 
 ```python

@@ -151,10 +151,12 @@ impl<E> From<TreeError> for RunError<E> {
 #[derive(Debug, Clone, Copy)]
 pub struct IterationMetrics {
     pub leaf: NodeId,
+    pub leaf_is_new: bool,
     pub path_len: usize,
     pub reward_prefix: f64,
     pub rollout_return: f64,
     pub total_return: f64,
+    pub node_count: usize,
 }
 
 /// Aggregate metrics for a complete search run.
@@ -164,6 +166,133 @@ pub struct RunMetrics {
     pub iterations_completed: usize,
     pub total_return_sum: f64,
     pub average_total_return: f64,
+}
+
+/// Standardized event model for detailed run logging.
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "event", rename_all = "snake_case")]
+pub enum RunLogEvent {
+    RunStarted {
+        iterations_requested: usize,
+        c: f64,
+        gamma: f64,
+        max_steps: usize,
+        return_type: ReturnType,
+        fixed_horizon_steps: usize,
+    },
+    IterationCompleted {
+        iteration: usize,
+        leaf_node_id: usize,
+        leaf_is_new: bool,
+        path_len: usize,
+        reward_prefix: f64,
+        rollout_return: f64,
+        total_return: f64,
+        node_count: usize,
+    },
+    RunCompleted {
+        iterations_requested: usize,
+        iterations_completed: usize,
+        total_return_sum: f64,
+        average_total_return: f64,
+    },
+}
+
+impl RunLogEvent {
+    fn return_type_name(return_type: ReturnType) -> &'static str {
+        match return_type {
+            ReturnType::Discounted => "discounted",
+            ReturnType::EpisodicUndiscounted => "episodic_undiscounted",
+            ReturnType::FixedHorizon => "fixed_horizon",
+        }
+    }
+
+    pub fn run_started(config: &SearchConfig) -> Self {
+        Self::RunStarted {
+            iterations_requested: config.iterations,
+            c: config.c,
+            gamma: config.gamma,
+            max_steps: config.max_steps,
+            return_type: config.return_type,
+            fixed_horizon_steps: config.fixed_horizon_steps,
+        }
+    }
+
+    pub fn iteration_completed(iteration: usize, metrics: &IterationMetrics) -> Self {
+        Self::IterationCompleted {
+            iteration,
+            leaf_node_id: metrics.leaf.index(),
+            leaf_is_new: metrics.leaf_is_new,
+            path_len: metrics.path_len,
+            reward_prefix: metrics.reward_prefix,
+            rollout_return: metrics.rollout_return,
+            total_return: metrics.total_return,
+            node_count: metrics.node_count,
+        }
+    }
+
+    pub fn run_completed(metrics: &RunMetrics) -> Self {
+        Self::RunCompleted {
+            iterations_requested: metrics.iterations_requested,
+            iterations_completed: metrics.iterations_completed,
+            total_return_sum: metrics.total_return_sum,
+            average_total_return: metrics.average_total_return,
+        }
+    }
+
+    pub fn to_text_line(&self) -> String {
+        match self {
+            RunLogEvent::RunStarted {
+                iterations_requested,
+                c,
+                gamma,
+                max_steps,
+                return_type,
+                fixed_horizon_steps,
+            } => format!(
+                "run_started iterations_requested={} c={:.6} gamma={:.6} max_steps={} return_type={} fixed_horizon_steps={}",
+                iterations_requested,
+                c,
+                gamma,
+                max_steps,
+                Self::return_type_name(*return_type),
+                fixed_horizon_steps
+            ),
+            RunLogEvent::IterationCompleted {
+                iteration,
+                leaf_node_id,
+                leaf_is_new,
+                path_len,
+                reward_prefix,
+                rollout_return,
+                total_return,
+                node_count,
+            } => format!(
+                "iteration_completed iteration={} leaf_node_id={} leaf_is_new={} path_len={} reward_prefix={:.6} rollout_return={:.6} total_return={:.6} node_count={}",
+                iteration,
+                leaf_node_id,
+                leaf_is_new,
+                path_len,
+                reward_prefix,
+                rollout_return,
+                total_return,
+                node_count
+            ),
+            RunLogEvent::RunCompleted {
+                iterations_requested,
+                iterations_completed,
+                total_return_sum,
+                average_total_return,
+            } => format!(
+                "run_completed iterations_requested={} iterations_completed={} total_return_sum={:.6} average_total_return={:.6}",
+                iterations_requested, iterations_completed, total_return_sum, average_total_return
+            ),
+        }
+    }
+
+    pub fn to_json_line(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
+    }
 }
 
 impl RunMetrics {
@@ -269,10 +398,12 @@ impl Tree {
 
         Ok(IterationMetrics {
             leaf: policy_result.leaf,
+            leaf_is_new: policy_result.leaf_is_new,
             path_len: policy_result.path.len(),
             reward_prefix: policy_result.reward,
             rollout_return,
             total_return,
+            node_count: self.node_count(),
         })
     }
 

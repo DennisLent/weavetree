@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::tree::ids::{NodeId, StateKey};
 
 //TODO: Potentially need to switch the set to a hashmap, lets see about that later
@@ -105,5 +107,12 @@ impl OutcomeSet {
             .iter()
             .find(|outcome| outcome.next_state_key == next_state_key)
             .map(|outcome| outcome.count())
+    }
+
+    /// Iterate over all observed outcomes as `(next_state_key, child_node_id, count)`.
+    pub fn iter(&self) -> impl Iterator<Item = (StateKey, NodeId, u64)> + '_ {
+        self.outcomes
+            .iter()
+            .map(|outcome| (outcome.next_state_key, outcome.child(), outcome.count()))
     }
 }

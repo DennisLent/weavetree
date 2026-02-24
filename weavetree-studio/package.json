@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "test": "vitest run",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "render-tree": "node scripts/create_tree_visual.mjs"
   },
   "dependencies": {
     "@xyflow/react": "^12.10.1",

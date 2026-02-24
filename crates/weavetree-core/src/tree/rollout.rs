@@ -43,6 +43,7 @@ impl RolloutParams {
 /// - `num_actions(state_key) -> usize`
 /// - `step(state_key, action_id) -> (next_state_key, reward, is_terminal)`
 /// - `rollout_policy(state_key, num_actions) -> action_id`
+#[allow(dead_code)]
 pub fn rollout<FNum, FStep, FPolicy>(
     start_state_key: StateKey,
     mut num_actions: FNum,

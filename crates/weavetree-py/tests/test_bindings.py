@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from weavetree.mdp import MdpSimulator, TypedSimulator, compile_yaml_str
@@ -297,3 +299,40 @@ states:
 
     with pytest.raises(RuntimeError):
         t.run(sim, config, rollout_policy=boom)
+
+
+def test_tree_run_writes_jsonl_logs(tmp_path):
+    compiled = compile_yaml_str(VALID_MDP_YAML)
+    sim = MdpSimulator(compiled, 7)
+    t = tree(compiled.start_state_key(), compiled.is_terminal(compiled.start_state_key()))
+    config = SearchConfig(iterations=4, c=0.0, gamma=1.0, max_steps=2)
+    log_path = tmp_path / "run.jsonl"
+
+    metrics = t.run(sim, config, log_format="jsonl", log_path=str(log_path))
+    assert metrics.iterations_completed == 4
+
+    lines = log_path.read_text().strip().splitlines()
+    assert len(lines) == 6
+
+    events = [json.loads(line) for line in lines]
+    assert events[0]["event"] == "run_started"
+    assert events[-1]["event"] == "run_completed"
+    assert events[1]["event"] == "iteration_completed"
+    assert events[1]["iteration"] == 0
+
+
+def test_tree_run_exports_tree_snapshot_json(tmp_path):
+    compiled = compile_yaml_str(VALID_MDP_YAML)
+    sim = MdpSimulator(compiled, 7)
+    t = tree(compiled.start_state_key(), compiled.is_terminal(compiled.start_state_key()))
+    config = SearchConfig(iterations=4, c=0.0, gamma=1.0, max_steps=2)
+    export_path = tmp_path / "tree_snapshot.json"
+
+    metrics = t.run(sim, config, export_tree_path=str(export_path))
+    assert metrics.iterations_completed == 4
+
+    payload = json.loads(export_path.read_text())
+    assert payload["schema_version"] == 1
+    assert payload["root_node_id"] == 0
+    assert payload["node_count"] >= 1
+    assert len(payload["nodes"]) == payload["node_count"]

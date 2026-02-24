@@ -8,6 +8,7 @@ The crate root re-exports the primary types used by consumers.
 ## Re-exported types
 
 - `Tree` and `TreePolicyResult`
+- `TreeSnapshot`, `NodeSnapshot`, `ActionEdgeSnapshot`, `OutcomeSnapshot`
 - `SearchConfig`, `SearchConfigError`
 - `IterationMetrics`, `RunMetrics`
 - `ReturnType`
@@ -32,6 +33,11 @@ Search entry points:
 - `run(...)` executes many iterations.
 - `run_with_hook(...)` executes many iterations with per-iteration callback.
 
+Export entry points:
+
+- `snapshot()` exports a structured tree snapshot.
+- `snapshot_json_pretty()` exports the same snapshot as pretty JSON text.
+
 Decision extraction:
 
 - `best_root_action_by_visits()` picks root edge with highest visit count.
@@ -44,10 +50,12 @@ Both methods return `Result<Option<ActionId>, TreeError>`. `None` means the root
 `IterationMetrics` is emitted per iteration and includes:
 
 - `leaf`
+- `leaf_is_new`
 - `path_len`
 - `reward_prefix`
 - `rollout_return`
 - `total_return`
+- `node_count`
 
 `RunMetrics` aggregates:
 
@@ -55,6 +63,12 @@ Both methods return `Result<Option<ActionId>, TreeError>`. `None` means the root
 - `iterations_completed`
 - `total_return_sum`
 - `average_total_return`
+
+Standardized detailed logging events are available via `RunLogEvent`:
+
+- `run_started`
+- `iteration_completed`
+- `run_completed`
 
 ## `ReturnType`
 

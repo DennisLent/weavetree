@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::tree::{
     edges::ActionEdge,
     ids::{ActionId, NodeId, StateKey},
@@ -15,7 +17,6 @@ pub enum ExpansionState {
 #[derive(Debug, Clone)]
 /// represents a decision state in the search tree.
 /// This class iterates edges to select best UCB action and accesses an edge by action index
-
 pub struct Node {
     state_key: StateKey,
     depth: u64,

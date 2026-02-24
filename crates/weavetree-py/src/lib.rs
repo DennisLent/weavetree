@@ -1,10 +1,16 @@
 #![allow(unsafe_op_in_unsafe_fn)]
+#![allow(clippy::useless_conversion)]
 
-use std::{cell::RefCell, collections::HashMap};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    fs::File,
+    io::{BufWriter, Write},
+};
 
 use ::weavetree_core::{
-    ActionId, ReturnType, RunError, RunMetrics, SearchConfig, StateKey as CoreStateKey, Tree,
-    TreeError,
+    ActionId, ReturnType, RunError, RunLogEvent, RunMetrics, SearchConfig,
+    StateKey as CoreStateKey, Tree, TreeError,
 };
 use ::weavetree_mdp::{CompiledMdp, MdpError, MdpSimulator, MdpSpec, StateKey, compile_yaml};
 use pyo3::exceptions::{PyKeyError, PyTypeError, PyValueError};
@@ -33,6 +39,62 @@ fn parse_return_type(value: &str) -> PyResult<ReturnType> {
             "invalid return_type; expected one of: discounted, episodic_undiscounted, fixed_horizon",
         )),
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum PyLogFormat {
+    Text,
+    Jsonl,
+}
+
+fn parse_log_format(value: &str) -> PyResult<PyLogFormat> {
+    match value {
+        "text" => Ok(PyLogFormat::Text),
+        "jsonl" => Ok(PyLogFormat::Jsonl),
+        _ => Err(PyValueError::new_err(
+            "invalid log_format; expected one of: text, jsonl",
+        )),
+    }
+}
+
+fn write_log_event(
+    event: &RunLogEvent,
+    format: PyLogFormat,
+    print_to_stdout: bool,
+    log_writer: &mut Option<BufWriter<File>>,
+) -> PyResult<()> {
+    let line = match format {
+        PyLogFormat::Text => event.to_text_line(),
+        PyLogFormat::Jsonl => event
+            .to_json_line()
+            .map_err(|err| PyValueError::new_err(err.to_string()))?,
+    };
+
+    if print_to_stdout {
+        println!("{line}");
+    }
+
+    if let Some(writer) = log_writer.as_mut() {
+        writer
+            .write_all(line.as_bytes())
+            .map_err(|err| PyValueError::new_err(err.to_string()))?;
+        writer
+            .write_all(b"\n")
+            .map_err(|err| PyValueError::new_err(err.to_string()))?;
+    }
+
+    Ok(())
+}
+
+fn write_tree_snapshot(tree: &Tree, export_tree_path: Option<&str>) -> PyResult<()> {
+    if let Some(path) = export_tree_path {
+        let json = tree
+            .snapshot_json_pretty()
+            .map_err(|err| PyValueError::new_err(err.to_string()))?;
+        std::fs::write(path, json).map_err(|err| PyValueError::new_err(err.to_string()))?;
+    }
+
+    Ok(())
 }
 
 #[pyclass(name = "CompiledMdp", module = "weavetree.mdp")]
@@ -224,7 +286,7 @@ impl PyTypedSimulator {
     }
 
     fn intern_state(&self, py: Python<'_>, state: Py<PyAny>) -> PyResult<u64> {
-        let frozen_state = Self::deep_copy(py, &state.bind(py))?;
+        let frozen_state = Self::deep_copy(py, state.bind(py))?;
         let token_obj = self
             .domain
             .bind(py)
@@ -350,7 +412,7 @@ impl PyTypedSimulator {
             let state = self
                 .state_by_key(py, state_key)
                 .ok_or_else(|| PyKeyError::new_err(format!("unknown state key: {state_key}")))?;
-            Self::deep_copy(py, &state.bind(py))
+            Self::deep_copy(py, state.bind(py))
         })
     }
 
@@ -572,7 +634,7 @@ impl PyTree {
             .map_err(tree_err_to_py)
     }
 
-    /// run($self, simulator, config, rollout_action=0, rollout_policy=None, /)
+    /// run($self, simulator, config, rollout_action=0, rollout_policy=None, *, detailed_logging=False, log_format='text', log_path=None, export_tree_path=None)
     /// --
     ///
     /// Run MCTS using either `MdpSimulator` or `TypedSimulator`.
@@ -581,23 +643,55 @@ impl PyTree {
     /// `(state_key: int, num_actions: int) -> action_id: int`.
     /// Otherwise `rollout_action` is used and clamped to valid range.
     /// Callback failures are propagated immediately.
-    #[pyo3(signature = (simulator, config, rollout_action=0, rollout_policy=None))]
-    #[pyo3(text_signature = "($self, simulator, config, rollout_action=0, rollout_policy=None, /)")]
+    ///
+    /// If `detailed_logging=True`, per-iteration diagnostics are printed.
+    /// If `log_path` is provided, diagnostics are also written to disk.
+    /// `log_format` accepts `"text"` or `"jsonl"`.
+    /// If `export_tree_path` is provided, final tree state is exported as JSON.
+    #[pyo3(signature = (simulator, config, rollout_action=0, rollout_policy=None, *, detailed_logging=false, log_format="text", log_path=None, export_tree_path=None))]
+    #[pyo3(
+        text_signature = "($self, simulator, config, rollout_action=0, rollout_policy=None, *, detailed_logging=False, log_format='text', log_path=None, export_tree_path=None)"
+    )]
+    #[allow(clippy::too_many_arguments)]
     fn run(
         &mut self,
         simulator: &Bound<'_, PyAny>,
         config: PyRef<'_, PySearchConfig>,
         rollout_action: usize,
         rollout_policy: Option<&Bound<'_, PyAny>>,
+        detailed_logging: bool,
+        log_format: &str,
+        log_path: Option<String>,
+        export_tree_path: Option<String>,
     ) -> PyResult<PyRunMetrics> {
         let rollout_policy: Option<Py<PyAny>> =
             rollout_policy.map(|policy| policy.clone().unbind());
+        let log_format = parse_log_format(log_format)?;
+        let mut log_writer = match log_path {
+            Some(path) => Some(BufWriter::new(
+                File::create(path).map_err(|err| PyValueError::new_err(err.to_string()))?,
+            )),
+            None => None,
+        };
+        let logging_enabled = detailed_logging || log_writer.is_some();
 
         if let Ok(simulator) = simulator.extract::<PyRef<'_, PyMdpSimulator>>() {
             let sim_cell = &simulator.inner;
+            let mut logging_error: Option<PyErr> = None;
+            let mut iteration_index: usize = 0;
+
+            if logging_enabled {
+                write_log_event(
+                    &RunLogEvent::run_started(&config.inner),
+                    log_format,
+                    detailed_logging,
+                    &mut log_writer,
+                )?;
+            }
+
             let metrics = self
                 .inner
-                .run_fallible(
+                .run_with_hook_fallible(
                     &config.inner,
                     |state| {
                         Ok::<usize, PyErr>(
@@ -632,19 +726,69 @@ impl PyTree {
                             Ok(ActionId::from(clamped))
                         }
                     },
+                    |iteration_metrics| {
+                        if !logging_enabled || logging_error.is_some() {
+                            iteration_index += 1;
+                            return;
+                        }
+
+                        let event =
+                            RunLogEvent::iteration_completed(iteration_index, iteration_metrics);
+                        iteration_index += 1;
+
+                        if let Err(err) =
+                            write_log_event(&event, log_format, detailed_logging, &mut log_writer)
+                        {
+                            logging_error = Some(err);
+                        }
+                    },
                 )
                 .map_err(|err| match err {
                     RunError::Tree(tree_err) => tree_err_to_py(tree_err),
                     RunError::Callback(py_err) => py_err,
                 })?;
+
+            if let Some(err) = logging_error {
+                return Err(err);
+            }
+
+            if logging_enabled {
+                write_log_event(
+                    &RunLogEvent::run_completed(&metrics),
+                    log_format,
+                    detailed_logging,
+                    &mut log_writer,
+                )?;
+            }
+
+            if let Some(writer) = log_writer.as_mut() {
+                writer
+                    .flush()
+                    .map_err(|err| PyValueError::new_err(err.to_string()))?;
+            }
+
+            write_tree_snapshot(&self.inner, export_tree_path.as_deref())?;
+
             return Ok(metrics.into());
         }
 
         if let Ok(simulator) = simulator.extract::<PyRef<'_, PyTypedSimulator>>() {
             let sim = simulator;
+            let mut logging_error: Option<PyErr> = None;
+            let mut iteration_index: usize = 0;
+
+            if logging_enabled {
+                write_log_event(
+                    &RunLogEvent::run_started(&config.inner),
+                    log_format,
+                    detailed_logging,
+                    &mut log_writer,
+                )?;
+            }
+
             let metrics = self
                 .inner
-                .run_fallible(
+                .run_with_hook_fallible(
                     &config.inner,
                     |state| sim.num_actions_by_key_impl(state.value()),
                     |state, action| {
@@ -670,11 +814,49 @@ impl PyTree {
                             Ok(ActionId::from(clamped))
                         }
                     },
+                    |iteration_metrics| {
+                        if !logging_enabled || logging_error.is_some() {
+                            iteration_index += 1;
+                            return;
+                        }
+
+                        let event =
+                            RunLogEvent::iteration_completed(iteration_index, iteration_metrics);
+                        iteration_index += 1;
+
+                        if let Err(err) =
+                            write_log_event(&event, log_format, detailed_logging, &mut log_writer)
+                        {
+                            logging_error = Some(err);
+                        }
+                    },
                 )
                 .map_err(|err| match err {
                     RunError::Tree(tree_err) => tree_err_to_py(tree_err),
                     RunError::Callback(py_err) => py_err,
                 })?;
+
+            if let Some(err) = logging_error {
+                return Err(err);
+            }
+
+            if logging_enabled {
+                write_log_event(
+                    &RunLogEvent::run_completed(&metrics),
+                    log_format,
+                    detailed_logging,
+                    &mut log_writer,
+                )?;
+            }
+
+            if let Some(writer) = log_writer.as_mut() {
+                writer
+                    .flush()
+                    .map_err(|err| PyValueError::new_err(err.to_string()))?;
+            }
+
+            write_tree_snapshot(&self.inner, export_tree_path.as_deref())?;
+
             return Ok(metrics.into());
         }
 

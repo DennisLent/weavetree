@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use core::f64;
 
 use crate::tree::{
@@ -75,6 +77,11 @@ impl ActionEdge {
         self.edge_stats.q()
     }
 
+    /// Return the raw accumulated return for this edge.
+    pub fn value_sum(&self) -> f64 {
+        self.edge_stats.value_sum()
+    }
+
     /// Return the amount of distinct outcomes observed under this edge.
     pub fn outcomes_len(&self) -> usize {
         self.outcomes.len()
@@ -83,5 +90,10 @@ impl ActionEdge {
     /// Return the count for a given observed next state key.
     pub fn outcome_count_for(&self, next_state_key: StateKey) -> Option<u64> {
         self.outcomes.count_for(next_state_key)
+    }
+
+    /// Iterate outcomes as `(next_state_key, child_node_id, count)`.
+    pub fn outcomes_iter(&self) -> impl Iterator<Item = (StateKey, NodeId, u64)> + '_ {
+        self.outcomes.iter()
     }
 }

@@ -13,13 +13,25 @@ import {
 import '@xyflow/react/dist/style.css'
 import './App.css'
 import { mdpSpecToYaml, toMdpSpecFromGraph } from './model/exportMdp'
+import { parseTreeSnapshot, treeSnapshotToReactFlow } from './model/treeSnapshotGraph'
+import { renderTreeSnapshotSvg } from './model/renderTreeSvg'
 
 function formatOutcomeLabel(probability, reward) {
   return `p=${probability}, r=${reward}`
 }
 
-// State nodes expose 4 source and 4 target handles (top/right/bottom/left)
-// to make dense MDP layouts easier to route.
+function downloadTextFile(content, filename, contentType) {
+  const blob = new Blob([content], { type: contentType })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
+}
+
 function StateNode({ data }) {
   return (
     <div className={`state-node ${data.terminal ? 'terminal' : ''}`}>
@@ -84,8 +96,6 @@ function StateNode({ data }) {
   )
 }
 
-// Action nodes are compact decision points that receive one incoming
-// state link and emit one or more outcome links to states.
 function ActionNode({ data }) {
   return (
     <div className="action-node">
@@ -111,7 +121,6 @@ const nodeTypes = {
   action: ActionNode,
 }
 
-// Starter graph for immediate interaction in the studio UI.
 const initialNodes = [
   {
     id: 's-0',
@@ -157,7 +166,24 @@ const initialEdges = [
   },
 ]
 
-export default function App() {
+function ModeChooser({ onSelectMode }) {
+  return (
+    <div className="mode-shell">
+      <div className="mode-card">
+        <h1>Weavetree Studio</h1>
+        <p>Choose how you want to work.</p>
+        <div className="mode-actions">
+          <button onClick={() => onSelectMode('mdp')}>Create MDP</button>
+          <button className="secondary" onClick={() => onSelectMode('tree')}>
+            Visualize Tree
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MdpStudioView({ onBack }) {
   const [nodes, setNodes] = useState(initialNodes)
   const [edges, setEdges] = useState(initialEdges)
   const [stateIdInput, setStateIdInput] = useState('')
@@ -182,10 +208,6 @@ export default function App() {
     [],
   )
 
-  // Connection rules:
-  // 1) state -> action (an action can belong to only one state)
-  // 2) action -> state (outcomes with probability/reward metadata)
-  // Any other connection shape is rejected.
   const onConnect = useCallback(
     (params) => {
       if (!params.source || !params.target) {
@@ -204,8 +226,7 @@ export default function App() {
 
         if (sourceNode.type === 'state' && targetNode.type === 'action') {
           const actionIncoming = edgesSnapshot.filter(
-            (edge) =>
-              edge.data?.edgeType === 'stateAction' && edge.target === targetNode.id,
+            (edge) => edge.data?.edgeType === 'stateAction' && edge.target === targetNode.id,
           )
           if (actionIncoming.length > 0) {
             setErrorMessage('Action already belongs to a source state.')
@@ -239,8 +260,7 @@ export default function App() {
 
         if (sourceNode.type === 'action' && targetNode.type === 'state') {
           const currentOutcomes = edgesSnapshot.filter(
-            (edge) =>
-              edge.data?.edgeType === 'outcome' && edge.source === sourceNode.id,
+            (edge) => edge.data?.edgeType === 'outcome' && edge.source === sourceNode.id,
           )
           const currentSum = currentOutcomes.reduce(
             (sum, edge) => sum + (edge.data?.probability ?? 0),
@@ -258,7 +278,6 @@ export default function App() {
           const probability = currentOutcomes.length === 0 ? 1 : remaining
           const reward = 0
 
-          // New outcomes default to reward=0 and consume remaining probability.
           return addEdge(
             {
               id: `o-${edgeCounterRef.current++}`,
@@ -330,7 +349,6 @@ export default function App() {
   const selectedNode = nodes.find((node) => node.id === selectedNodeId)
   const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId)
 
-  // Partial data patch helper used by side-panel editors.
   const updateNodeData = (nodeId, partialData) => {
     setNodes((snapshot) =>
       snapshot.map((node) => {
@@ -349,9 +367,7 @@ export default function App() {
     const trimmedId = stateIdInput.trim()
     const stateId = trimmedId === '' ? String(nextStateIdRef.current++) : trimmedId
 
-    if (
-      nodes.some((node) => node.type === 'state' && node.data?.stateId === stateId)
-    ) {
+    if (nodes.some((node) => node.type === 'state' && node.data?.stateId === stateId)) {
       setErrorMessage(`State id "${stateId}" already exists.`)
       return
     }
@@ -420,7 +436,6 @@ export default function App() {
           patch.probability !== undefined ? patch.probability : edge.data.probability
         const reward = patch.reward !== undefined ? patch.reward : edge.data.reward
 
-        // Keep edge label in sync with editable outcome data.
         return {
           ...edge,
           data: { ...edge.data, ...patch },
@@ -441,15 +456,7 @@ export default function App() {
         ? requestedName
         : `${requestedName}.mdp.yaml`
 
-      const blob = new Blob([yaml], { type: 'application/x-yaml;charset=utf-8' })
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = downloadName
-      document.body.appendChild(anchor)
-      anchor.click()
-      anchor.remove()
-      URL.revokeObjectURL(url)
+      downloadTextFile(yaml, downloadName, 'application/x-yaml;charset=utf-8')
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to export YAML.')
     }
@@ -459,6 +466,9 @@ export default function App() {
     <div className="app-shell">
       <aside className="side-panel">
         <h2>MDP Studio</h2>
+        <button className="secondary" onClick={onBack}>
+          Back to mode selection
+        </button>
 
         <div className="panel-section">
           <h3>Add State</h3>
@@ -496,9 +506,7 @@ export default function App() {
 
         <div className="panel-section">
           <h3>Editing</h3>
-          {!selectedNode && !selectedEdge ? (
-            <p className="muted">Select a node or edge to edit.</p>
-          ) : null}
+          {!selectedNode && !selectedEdge ? <p className="muted">Select a node or edge to edit.</p> : null}
 
           {selectedNode?.type === 'state' ? (
             <div className="editor-block">
@@ -677,4 +685,156 @@ export default function App() {
       </div>
     </div>
   )
+}
+
+function TreeVisualizerView({ onBack }) {
+  const [treeSnapshot, setTreeSnapshot] = useState(null)
+  const [graphData, setGraphData] = useState({ nodes: [], edges: [] })
+  const [treeFileName, setTreeFileName] = useState('tree_snapshot.json')
+  const [errorMessage, setErrorMessage] = useState('')
+
+  const handleUploadTree = (event) => {
+    const file = event.target.files?.[0]
+    if (!file) {
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const raw = JSON.parse(String(reader.result))
+        const parsed = parseTreeSnapshot(raw)
+        const flow = treeSnapshotToReactFlow(parsed)
+        setTreeSnapshot(parsed)
+        setGraphData(flow)
+        setTreeFileName(file.name)
+        setErrorMessage('')
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to parse tree JSON.')
+      }
+    }
+    reader.onerror = () => {
+      setErrorMessage('Failed to read the selected file.')
+    }
+    reader.readAsText(file)
+  }
+
+  const nodeCount = treeSnapshot?.node_count ?? 0
+  const actionEdgeCount = useMemo(
+    () => graphData.edges.filter((edge) => edge.data?.edgeType === 'stateAction').length,
+    [graphData.edges],
+  )
+  const outcomeEdgeCount = useMemo(
+    () => graphData.edges.filter((edge) => edge.data?.edgeType === 'outcome').length,
+    [graphData.edges],
+  )
+
+  const downloadSnapshot = () => {
+    if (!treeSnapshot) {
+      return
+    }
+    const name = treeFileName.trim() || 'tree_snapshot.json'
+    downloadTextFile(JSON.stringify(treeSnapshot, null, 2), name, 'application/json;charset=utf-8')
+  }
+
+  const downloadGraphJson = () => {
+    const payload = {
+      node_count: graphData.nodes.length,
+      edge_count: graphData.edges.length,
+      nodes: graphData.nodes,
+      edges: graphData.edges,
+    }
+    downloadTextFile(
+      JSON.stringify(payload, null, 2),
+      'tree_visualization.graph.json',
+      'application/json;charset=utf-8',
+    )
+  }
+
+  const downloadSvg = () => {
+    if (!treeSnapshot) {
+      return
+    }
+    const svg = renderTreeSnapshotSvg(treeSnapshot)
+    downloadTextFile(svg, 'tree_visualization.svg', 'image/svg+xml;charset=utf-8')
+  }
+
+  return (
+    <div className="app-shell">
+      <aside className="side-panel">
+        <h2>Tree Visualizer</h2>
+        <button className="secondary" onClick={onBack}>
+          Back to mode selection
+        </button>
+
+        <div className="panel-section">
+          <h3>Upload Tree JSON</h3>
+          <label>
+            Snapshot file
+            <input type="file" accept=".json,application/json" onChange={handleUploadTree} />
+          </label>
+          <p className="muted">Expected schema: TreeSnapshot v1 (from weavetree-core).</p>
+        </div>
+
+        <div className="panel-section">
+          <h3>Tree Stats</h3>
+          {!treeSnapshot ? (
+            <p className="muted">Upload a tree snapshot to visualize it.</p>
+          ) : (
+            <>
+              <p className="muted">nodes: {nodeCount}</p>
+              <p className="muted">state-action edges: {actionEdgeCount}</p>
+              <p className="muted">outcome edges: {outcomeEdgeCount}</p>
+              <p className="muted">root_node_id: {treeSnapshot.root_node_id}</p>
+            </>
+          )}
+        </div>
+
+        <div className="panel-section">
+          <h3>Export</h3>
+          <button onClick={downloadSnapshot} disabled={!treeSnapshot}>
+            Download tree JSON
+          </button>
+          <button onClick={downloadSvg} disabled={!treeSnapshot}>
+            Download SVG
+          </button>
+          <button onClick={downloadGraphJson} disabled={!treeSnapshot}>
+            Download graph JSON
+          </button>
+        </div>
+
+        {errorMessage ? <p className="error">{errorMessage}</p> : null}
+      </aside>
+
+      <div className="canvas-wrap">
+        <ReactFlow
+          nodes={graphData.nodes}
+          edges={graphData.edges}
+          nodeTypes={nodeTypes}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          elementsSelectable
+          fitView
+        >
+          <Background />
+          <MiniMap />
+          <Controls />
+        </ReactFlow>
+      </div>
+    </div>
+  )
+}
+
+export default function App() {
+  const [mode, setMode] = useState(null)
+
+  if (mode === 'mdp') {
+    return <MdpStudioView onBack={() => setMode(null)} />
+  }
+
+  if (mode === 'tree') {
+    return <TreeVisualizerView onBack={() => setMode(null)} />
+  }
+
+  return <ModeChooser onSelectMode={setMode} />
 }
