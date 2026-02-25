@@ -247,10 +247,11 @@ state_obj = sim.state_for_key(state_key)
 print("decoded start state:", state_obj)
 ```
 
-## End-to-end example
+## End-to-end example (with detailed logs + tree snapshot)
 
 ```python
-import weavetree as wt
+from pathlib import Path
+
 from weavetree.mdp import compile_yaml_str, MdpSimulator
 from weavetree.mcts import SearchConfig, tree
 
@@ -282,11 +283,110 @@ sim = MdpSimulator(compiled, 7)
 root_key = compiled.start_state_key()
 t = tree(root_key, compiled.is_terminal(root_key))
 
-config = SearchConfig(iterations=200, c=0.5, gamma=1.0, max_steps=4)
-metrics = t.run(sim, config, rollout_action=0)
+config = SearchConfig(iterations=6, c=0.5, gamma=1.0, max_steps=4)
+
+out_dir = Path("/tmp/weavetree-doc-runs")
+out_dir.mkdir(parents=True, exist_ok=True)
+log_path = out_dir / "python_run.jsonl"
+json_path = out_dir / "python_tree_snapshot.json"
+
+metrics = t.run(
+    sim,
+    config,
+    rollout_action=0,
+    detailed_logging=True,
+    log_format="text",
+    log_path=str(log_path),
+    export_tree_path=str(json_path),
+)
 
 print("completed:", metrics.iterations_completed)
 print("best action:", t.best_root_action_by_value())
+print("log_path:", log_path)
+print("json_path:", json_path)
+```
+
+Captured output from running this example:
+
+```text
+run_started iterations_requested=6 c=0.500000 gamma=1.000000 max_steps=4 return_type=discounted fixed_horizon_steps=32
+iteration_completed iteration=0 leaf_node_id=1 leaf_is_new=true path_len=1 reward_prefix=1.000000 rollout_return=0.000000 total_return=1.000000 node_count=2
+iteration_completed iteration=1 leaf_node_id=2 leaf_is_new=true path_len=1 reward_prefix=0.200000 rollout_return=0.000000 total_return=0.200000 node_count=3
+iteration_completed iteration=2 leaf_node_id=1 leaf_is_new=false path_len=1 reward_prefix=1.000000 rollout_return=0.000000 total_return=1.000000 node_count=3
+iteration_completed iteration=3 leaf_node_id=1 leaf_is_new=false path_len=1 reward_prefix=1.000000 rollout_return=0.000000 total_return=1.000000 node_count=3
+iteration_completed iteration=4 leaf_node_id=1 leaf_is_new=false path_len=1 reward_prefix=1.000000 rollout_return=0.000000 total_return=1.000000 node_count=3
+iteration_completed iteration=5 leaf_node_id=1 leaf_is_new=false path_len=1 reward_prefix=1.000000 rollout_return=0.000000 total_return=1.000000 node_count=3
+run_completed iterations_requested=6 iterations_completed=6 total_return_sum=5.200000 average_total_return=0.866667
+completed: 6
+best action: 0
+log_path: /tmp/weavetree-doc-runs/python_run.jsonl
+json_path: /tmp/weavetree-doc-runs/python_tree_snapshot.json
+```
+
+Exported `tree_snapshot.json` from that same run:
+
+```json
+{
+  "schema_version": 1,
+  "root_node_id": 0,
+  "node_count": 3,
+  "nodes": [
+    {
+      "node_id": 0,
+      "state_key": 0,
+      "depth": 0,
+      "is_terminal": false,
+      "parent_node_id": null,
+      "parent_action_id": null,
+      "edges": [
+        {
+          "action_id": 0,
+          "visits": 5,
+          "value_sum": 5.0,
+          "q": 1.0,
+          "outcomes": [
+            {
+              "next_state_key": 1,
+              "child_node_id": 1,
+              "count": 5
+            }
+          ]
+        },
+        {
+          "action_id": 1,
+          "visits": 1,
+          "value_sum": 0.2,
+          "q": 0.2,
+          "outcomes": [
+            {
+              "next_state_key": 2,
+              "child_node_id": 2,
+              "count": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "node_id": 1,
+      "state_key": 1,
+      "depth": 1,
+      "is_terminal": true,
+      "parent_node_id": 0,
+      "parent_action_id": 0,
+      "edges": []
+    },
+    {
+      "node_id": 2,
+      "state_key": 2,
+      "depth": 1,
+      "is_terminal": true,
+      "parent_node_id": 0,
+      "parent_action_id": 1,
+      "edges": []
+    }
+  ]
+}
 ```
 
 ## Error behavior

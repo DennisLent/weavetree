@@ -10,7 +10,6 @@ A fast, reproducible abstraction-aware Monte Carlo Tree Search engine written in
 - weavetree-cli for toolchain purposes
 - reproducibility
 - abstraction algorithms (partitioning, bisimulation, approximate bisimulation)
-
 - concurrency during simulation for faster sims
 - MCTS and uMCTS
 - Publish-ready crate metadata (description, license, repo, docs, crate-level readme, keywords, categories)
